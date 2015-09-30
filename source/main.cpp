@@ -20,27 +20,37 @@
 #include "ble-blocktransfer/BlockTransferService.h"
 #include "voytalk/VoytalkHub.h"
 
+/*****************************************************************************/
+/* Configuration                                                             */
+/*****************************************************************************/
+
+// set device name
+const char DEVICE_NAME[] = "Nesvoy";
+
+// set TX power
+#ifndef CFG_BLE_TX_POWER_LEVEL
+#define CFG_BLE_TX_POWER_LEVEL 0
+#endif
+
+// control debug output
 #if 1
 #define DEBUGOUT(...) { printf(__VA_ARGS__); }
 #else
 #define DEBUGOUT(...) /* nothing */
 #endif // DEBUGOUT
 
-#define DEBUG
+/*****************************************************************************/
 
-
-const char DEVICE_NAME[] = "Nesvoy";
+/* Voytalk short UUID */
 const UUID uuid(0xFE8E);
 
+/* Voytalk states */
 typedef enum {
-    STATE_UNPROVISIONED_DISCONNECTED = 0x00,
-    STATE_PROVISIONED_DISCONNECTED   = 0x01,
+    FLAG_CONNECTED      = 0x01,
+    FLAG_PROVISIONED    = 0x02,
+} flags_t;
 
-    STATE_UNPROVISIONED_CONNECTED    = 0x02 + 0x00,
-    STATE_PROVISIONED_CONNECTED      = 0x02 + 0x01
-} state_t;
-
-volatile static uint8_t state;
+static volatile uint8_t state;
 
 /*****************************************************************************/
 /* Global variables used by the test app                                     */
@@ -57,28 +67,35 @@ VoytalkHub vthub(DEVICE_NAME);
 
 // buffer for sending and receiving data
 SharedPointer<Block> writeBlock;
-uint8_t readBuffer[200];
+uint8_t readBuffer[1000];
 BlockStatic readBlock(readBuffer, sizeof(readBuffer));
 
 // wifi parameters
 std::string ssid_string;
 std::string key_string;
 
+// Compatibility function
+void signalReady();
+
 /*****************************************************************************/
 /* Functions for handling debug output                                       */
 /*****************************************************************************/
-
 
 /*
     Functions called when BLE device connects and disconnects.
 */
 void whenConnected(const Gap::ConnectionCallbackParams_t* params)
 {
+    (void) params;
     DEBUGOUT("main: Connected: %d %d %d\r\n", params->connectionParams->minConnectionInterval,
                                               params->connectionParams->maxConnectionInterval,
                                               params->connectionParams->slaveLatency);
 
-    state |= 0x02;
+    // change state in main application
+    state |= FLAG_CONNECTED;
+
+    // change state inside Voytalk hub
+    vthub.setStateMask(state);
 }
 
 void whenDisconnected(const Gap::DisconnectionCallbackParams_t*)
@@ -88,7 +105,11 @@ void whenDisconnected(const Gap::DisconnectionCallbackParams_t*)
 
     ble.gap().startAdvertising();
 
-    state &= ~0x02;
+    // change state in main application
+    state &= ~FLAG_CONNECTED;
+
+    // change state inside Voytalk hub
+    vthub.setStateMask(state);
 }
 
 
@@ -127,14 +148,14 @@ void blockServerWriteHandler(SharedPointer<Block> block)
         Process received data, assuming it is CBOR encoded.
         Any output generated will be written to the readBlock.
     */
-    vthub.processCBOR(block, &readBlock);
+    vthub.processCBOR((BlockStatic*) block.get(), &readBlock);
 
     /*
         If the readBlock length is non-zero it means a reply has been generated.
     */
     if (readBlock.getLength() > 0)
     {
-        minar::Scheduler::postCallback(blockServerSendNotification);
+        signalReady();
     }
 }
 
@@ -159,24 +180,13 @@ void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 {
     DEBUGOUT("main: wifi invocation\r\n");
 
-    // print object tree
+    // debug: print object tree
     object.print();
 
     /////////////////////////////////////////
-    // write to flash
-    SharedPointer<CborBase> parameters = object.getParameters();
-
-    CborMap* map = static_cast<CborMap*>(parameters.get());
-
-    SharedPointer<CborBase> ssid = map->find("ssid");
-    SharedPointer<CborBase> key = map->find("key");
-
-    CborString* ssid_cbor = static_cast<CborString*>(ssid.get());
-    CborString* key_cbor = static_cast<CborString*>(key.get());
-
-    // copy strings from CBOR object to global strings
-    ssid_string = ssid_cbor->getString();
-    key_string = key_cbor->getString();
+    // retrieve parameters
+    ssid_string = object.getParameters()->find("ssid")->getString();
+    key_string = object.getParameters()->find("key")->getString();
 
     /////////////////////////////////////////
     // create coda
@@ -188,13 +198,11 @@ void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     VoytalkCoda coda(invocationID, 1);
     hub.processCoda(coda);
 
-    // notify client about new data in read characteristic
-    minar::Scheduler::postCallback(blockServerSendNotification);
+    // change state in main application
+    state |= FLAG_PROVISIONED;
 
-    // optional: change state inside Voytalk hub
-    hub.setStateMask(0x02);
-
-    state = STATE_PROVISIONED_CONNECTED;
+    // change state inside Voytalk hub
+    hub.setStateMask(state);
 }
 
 
@@ -232,14 +240,11 @@ void resetIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     VoytalkCoda coda(invocationID, 1);
     hub.processCoda(coda);
 
-    // notify client about new data in read characteristic
-    minar::Scheduler::postCallback(blockServerSendNotification);
-
-    // optional: change state inside Voytalk hub
-    hub.setStateMask(0x01);
-
     // change state in main application
-    state = STATE_UNPROVISIONED_CONNECTED;
+    state &= ~FLAG_PROVISIONED;
+
+    // change state inside Voytalk hub
+    hub.setStateMask(state);
 }
 
 /*****************************************************************************/
@@ -273,9 +278,66 @@ void exampleIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     // create coda and pass to Voytalk hub
     VoytalkCoda coda(invocationID, 1);
     hub.processCoda(coda);
+}
 
-    // notify client about new data in read characteristic
-    minar::Scheduler::postCallback(blockServerSendNotification);
+/*****************************************************************************/
+/* Voytalk custom example                                                    */
+/*****************************************************************************/
+
+void customIntentConstruction(VoytalkHub& hub)
+{
+    DEBUGOUT("main: custom intent construction\r\n");
+
+    /*  Define custom constraints.
+        Note: constraints can be nested.
+    */
+
+    /* ssid, key are level 0 variables */
+    VoytalkConstraint L0_ssid("Network Name",
+                              VoytalkConstraint::TypeString,
+                              "ssid");
+
+    VoytalkConstraint L0_key("Password",
+                             VoytalkConstraint::TypeString,
+                             "key");
+
+    /* combine level 0 variables */
+    VoytalkConstraint* properties[] = { &L0_ssid,
+                                        &L0_key };
+
+    // define level 0
+    VoytalkConstraint constraints("Custom Access",
+                                  properties);
+
+    /* optional: default values */
+    L0_ssid.setDefaultValue("homehub");
+
+    /* optional: description fields */
+    L0_ssid.setDescription("The name of the network you want to connect to.");
+    L0_key.setDescription("The password for the network.");
+
+    constraints.setDescription("The device wants to access your Wifi network.");
+
+    /* create intent using generated endpoint and constraint set */
+    VoytalkIntent intent("com.arm.examples.custom", constraints);
+
+    /* serialize object tree to CBOR */
+    hub.processIntent(intent);
+}
+
+void customIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
+{
+    DEBUGOUT("main: custom example invocation\r\n");
+
+    // print object tree
+    object.print();
+
+    // Read ID from invocation. ID is returned in coda response.
+    uint32_t invocationID = object.getID();
+
+    // create coda and pass to Voytalk hub
+    VoytalkCoda coda(invocationID, 1);
+    hub.processCoda(coda);
 }
 
 /*****************************************************************************/
@@ -295,12 +357,19 @@ void app_start(int, char *[])
     // Wifi provisioning intent
     vthub.registerIntent(wifiIntentConstruction,
                          wifiIntentInvocation,
-                         0x01 | 0x02);
+                         FLAG_CONNECTED | FLAG_PROVISIONED);
 
     // reset intent
     vthub.registerIntent(resetIntentConstruction,
                          resetIntentInvocation,
-                         0x02);
+                         FLAG_PROVISIONED);
+
+    // custom intent
+#if 0
+    vthub.registerIntent(customIntentConstruction,
+                         customIntentInvocation,
+                         FLAG_CONNECTED | FLAG_PROVISIONED);
+#endif
 
     /*
         Set the current state mask.
@@ -308,8 +377,7 @@ void app_start(int, char *[])
         Mask is AND'ed with each intent's bitmap and only intents with non-zero
         results are displayed and can be invoked.
     */
-    vthub.setStateMask(0x01);
-
+    vthub.setStateMask(0);
 
     /*************************************************************************/
     /*************************************************************************/
@@ -320,23 +388,17 @@ void app_start(int, char *[])
     ble.gap().onConnection(whenConnected);
     ble.gap().onDisconnection(whenDisconnected);
 
-    // set fastest connection interval based on Apple recommendations
-    Gap::ConnectionParams_t fast;
-    ble.getPreferredConnectionParams(&fast);
-    fast.minConnectionInterval = 16; // 20 ms
-    fast.maxConnectionInterval = 32; // 40 ms
-    fast.slaveLatency = 0;
-    ble.gap().setPreferredConnectionParams(&fast);
-
     /* construct advertising beacon */
     ble.gap().accumulateAdvertisingPayload(GapAdvertisingData::BREDR_NOT_SUPPORTED|GapAdvertisingData::LE_GENERAL_DISCOVERABLE);
-    ble.gap().accumulateAdvertisingPayload(GapAdvertisingData::SHORTENED_LOCAL_NAME,
-                                     (const uint8_t *) DEVICE_NAME, sizeof(DEVICE_NAME) - 1);
-
+    ble.gap().accumulateAdvertisingPayload(GapAdvertisingData::SHORTENED_LOCAL_NAME, (const uint8_t *) DEVICE_NAME, sizeof(DEVICE_NAME) - 1);
     ble.gap().accumulateAdvertisingPayload(GapAdvertisingData::COMPLETE_LIST_16BIT_SERVICE_IDS, uuid.getBaseUUID(), uuid.getLen());
+    ble.gap().accumulateAdvertisingPayloadTxPower(CFG_BLE_TX_POWER_LEVEL);
 
     ble.gap().setAdvertisingType(GapAdvertisingParams::ADV_CONNECTABLE_UNDIRECTED);
-    ble.gap().setAdvertisingInterval(1600); /* 1s; in multiples of 0.625ms. */
+    ble.gap().setAdvertisingInterval(1000); /* 1s; in multiples of 0.625ms. */
+
+    // set TX power
+    ble.gap().setTxPower(CFG_BLE_TX_POWER_LEVEL);
 
     // Apple uses device name instead of beacon name
     ble.gap().setDeviceName((const uint8_t*) DEVICE_NAME);
@@ -357,3 +419,49 @@ void app_start(int, char *[])
 
     printf("Voytalk Test: %s %s\r\n", __DATE__, __TIME__);
 }
+
+
+/*****************************************************************************/
+/* Compatibility                                                             */
+/*****************************************************************************/
+
+#if defined(YOTTA_MINAR_VERSION_STRING)
+/*********************************************************/
+/* Build for mbed OS                                     */
+/*********************************************************/
+
+void signalReady()
+{
+    minar::Scheduler::postCallback(blockServerSendNotification);
+}
+
+#else
+/*********************************************************/
+/* Build for mbed Classic                                */
+/*********************************************************/
+
+bool sendNotification = false;
+
+void signalReady()
+{
+    sendNotification = true;
+}
+
+int main(void)
+{
+    app_start(0, NULL);
+
+    for(;;)
+    {
+        // send notification outside of interrupt context
+        if (sendNotification)
+        {
+            sendNotification = false;
+            blockServerSendNotification();
+        }
+
+        ble.waitForEvent();
+    }
+}
+#endif
+

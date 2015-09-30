@@ -16,11 +16,19 @@
     }
   ],
   "dependencies": {
-    "mbed-drivers":"~0.9.0",
-    "voytalk-cpp":"~2.0.0",
-    "ble":"~0.4.8",
-    "ble-blocktransfer-mbed":"~3.0.0"
+    "voytalk-cpp":"~2.0.0"
   },
-  "targetDependencies": {},
+  "targetDependencies": {
+    "mbed-os": {
+      "mbed-drivers": "~0.9.0"
+    },
+    "mbed-classic": {
+      "mbed-classic": "~0.0.4"
+    },
+    "mbed": {
+      "ble": "~0.4.8",
+      "ble-blocktransfer-mbed": "~3.0.0"
+    }
+  },
   "bin": "./source"
 }
