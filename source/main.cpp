@@ -18,14 +18,14 @@
 #include "mbed.h"
 #include "ble/BLE.h"
 #include "ble-blocktransfer/BlockTransferService.h"
-#include "voytalk/VoytalkHub.h"
+#include "voytalk/Voytalk.h"
 
 /*****************************************************************************/
 /* Configuration                                                             */
 /*****************************************************************************/
 
 // set device name
-const char DEVICE_NAME[] = "Nesvoy";
+const char DEVICE_NAME[] = "Testvoy";
 
 // set TX power
 #ifndef CFG_BLE_TX_POWER_LEVEL
@@ -63,7 +63,7 @@ BLE ble;
 BlockTransferService bts;
 
 // Voytalk handling
-VoytalkHub vthub(DEVICE_NAME);
+VoytalkRouter router(DEVICE_NAME);
 
 // buffer for sending and receiving data
 SharedPointer<Block> writeBlock;
@@ -95,7 +95,7 @@ void whenConnected(const Gap::ConnectionCallbackParams_t* params)
     state |= FLAG_CONNECTED;
 
     // change state inside Voytalk hub
-    vthub.setStateMask(state);
+    router.setStateMask(state);
 }
 
 void whenDisconnected(const Gap::DisconnectionCallbackParams_t*)
@@ -109,7 +109,7 @@ void whenDisconnected(const Gap::DisconnectionCallbackParams_t*)
     state &= ~FLAG_CONNECTED;
 
     // change state inside Voytalk hub
-    vthub.setStateMask(state);
+    router.setStateMask(state);
 }
 
 
@@ -148,7 +148,7 @@ void blockServerWriteHandler(SharedPointer<Block> block)
         Process received data, assuming it is CBOR encoded.
         Any output generated will be written to the readBlock.
     */
-    vthub.processCBOR((BlockStatic*) block.get(), &readBlock);
+    router.processCBOR((BlockStatic*) block.get(), &readBlock);
 
     /*
         If the readBlock length is non-zero it means a reply has been generated.
@@ -166,16 +166,16 @@ void blockServerWriteHandler(SharedPointer<Block> block)
 /*
     Callback function for constructing wifi intent.
 */
-void wifiIntentConstruction(VoytalkHub& hub)
+void wifiIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: wifi intent construction\r\n");
     /* create intent using generated endpoint and constraint set */
-    VoytalkIntent intent("com.arm.connectivity.wifi");
+    VTIntent intent("com.arm.connectivity.wifi");
+    intent.knownParameters("/networks");
 
-    /* serialize object tree to CBOR */
-    hub.processIntent(intent);
+    res.write(intent);
 }
-
+/*
 void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 {
     DEBUGOUT("main: wifi invocation\r\n");
@@ -203,7 +203,7 @@ void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 
     // change state inside Voytalk hub
     hub.setStateMask(state);
-}
+}*/
 
 
 
@@ -212,17 +212,16 @@ void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 /*****************************************************************************/
 
 
-void resetIntentConstruction(VoytalkHub& hub)
+void resetIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: reset intent construction\r\n");
 
     /* create intent using generated endpoint and constraint set */
-    VoytalkIntent intent("com.arm.reset");
+    VTIntent intent("com.arm.reset");
 
-    /* serialize object tree to CBOR */
-    hub.processIntent(intent);
+    res.write(intent);
 }
-
+/*
 void resetIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 {
     DEBUGOUT("main: reset invocation\r\n");
@@ -246,6 +245,7 @@ void resetIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     // change state inside Voytalk hub
     hub.setStateMask(state);
 }
+*/
 
 /*****************************************************************************/
 /* Voytalk complex example                                                   */
@@ -254,17 +254,16 @@ void resetIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 /*
     Callback functions for the example intent.
 */
-void exampleIntentConstruction(VoytalkHub& hub)
+void exampleIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: complex example intent construction\r\n");
 
     /* create intent */
-    VoytalkIntent intent("com.arm.examples.complex");
+    VTIntent intent("com.arm.examples.complex");
 
-    /* serialize object tree to CBOR */
-    hub.processIntent(intent);
+    res.write(intent);
 }
-
+/*
 void exampleIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 {
     DEBUGOUT("main: complex example invocation\r\n");
@@ -279,52 +278,52 @@ void exampleIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     VoytalkCoda coda(invocationID, 1);
     hub.processCoda(coda);
 }
+*/
 
 /*****************************************************************************/
 /* Voytalk custom example                                                    */
 /*****************************************************************************/
 
-void customIntentConstruction(VoytalkHub& hub)
+void customIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: custom intent construction\r\n");
 
-    /*  Define custom constraints.
-        Note: constraints can be nested.
-    */
+    // /*  Define custom constraints.
+    //     Note: constraints can be nested.
+    // */
 
-    /* ssid, key are level 0 variables */
-    VoytalkConstraint L0_ssid("Network Name",
-                              VoytalkConstraint::TypeString,
-                              "ssid");
+    // /* ssid, key are level 0 variables */
+    // VoytalkConstraint L0_ssid("Network Name",
+    //                           VoytalkConstraint::TypeString,
+    //                           "ssid");
 
-    VoytalkConstraint L0_key("Password",
-                             VoytalkConstraint::TypeString,
-                             "key");
+    // VoytalkConstraint L0_key("Password",
+    //                          VoytalkConstraint::TypeString,
+    //                          "key");
 
-    /* combine level 0 variables */
-    VoytalkConstraint* properties[] = { &L0_ssid,
-                                        &L0_key };
+    // /* combine level 0 variables */
+    // VoytalkConstraint* properties[] = { &L0_ssid,
+    //                                     &L0_key };
 
-    // define level 0
-    VoytalkConstraint constraints("Custom Access",
-                                  properties);
+    // // define level 0
+    // VoytalkConstraint constraints("Custom Access",
+    //                               properties);
 
-    /* optional: default values */
-    L0_ssid.setDefaultValue("homehub");
+    // /* optional: default values */
+    // L0_ssid.setDefaultValue("homehub");
 
-    /* optional: description fields */
-    L0_ssid.setDescription("The name of the network you want to connect to.");
-    L0_key.setDescription("The password for the network.");
+    // /* optional: description fields */
+    // L0_ssid.setDescription("The name of the network you want to connect to.");
+    // L0_key.setDescription("The password for the network.");
 
-    constraints.setDescription("The device wants to access your Wifi network.");
+    // constraints.setDescription("The device wants to access your Wifi network.");
 
-    /* create intent using generated endpoint and constraint set */
-    VoytalkIntent intent("com.arm.examples.custom", constraints);
+    // /* create intent using generated endpoint and constraint set */
+    // VTIntent intent("com.arm.examples.custom", constraints);
 
-    /* serialize object tree to CBOR */
-    hub.processIntent(intent);
+    // callback(200, intent);
 }
-
+/*
 void customIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 {
     DEBUGOUT("main: custom example invocation\r\n");
@@ -338,6 +337,26 @@ void customIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
     // create coda and pass to Voytalk hub
     VoytalkCoda coda(invocationID, 1);
     hub.processCoda(coda);
+}*/
+
+
+void networkListResource(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+{
+    DEBUGOUT("listing network resources");
+
+    VoytalkKnownParameters parameters(res, 2);
+
+    parameters.parameter("com.arm.connectivity.wifi", 50)
+        .map(2)
+            .item("ssid", "miWifi")
+            .item("key", "supersecurepassword");
+
+    parameters.parameter("com.arm.connectivity.wifi", 20)
+        .map(2)
+            .item("ssid", "yoWifi")
+            .item("key", "securepasswordinit");
+
+    done(200);
 }
 
 /*****************************************************************************/
@@ -355,19 +374,16 @@ void app_start(int, char *[])
     */
 
     // Wifi provisioning intent
-    vthub.registerIntent(wifiIntentConstruction,
-                         wifiIntentInvocation,
-                         FLAG_CONNECTED | FLAG_PROVISIONED);
+    router.registerIntent(wifiIntentConstruction,
+                          FLAG_CONNECTED | FLAG_PROVISIONED);
 
     // reset intent
-    vthub.registerIntent(resetIntentConstruction,
-                         resetIntentInvocation,
-                         FLAG_PROVISIONED);
+    router.registerIntent(resetIntentConstruction,
+                          FLAG_PROVISIONED);
 
     // custom intent
 #if 0
-    vthub.registerIntent(customIntentConstruction,
-                         customIntentInvocation,
+    router.registerIntent(customIntentConstruction,
                          FLAG_CONNECTED | FLAG_PROVISIONED);
 #endif
 
@@ -377,7 +393,14 @@ void app_start(int, char *[])
         Mask is AND'ed with each intent's bitmap and only intents with non-zero
         results are displayed and can be invoked.
     */
-    vthub.setStateMask(0);
+    router.setStateMask(0);
+
+    /*
+        Define some resource callbacks
+    */
+
+    router.get("/networks", networkListResource);
+    router.post("/otherthing", networkListResource);
 
     /*************************************************************************/
     /*************************************************************************/
