@@ -172,39 +172,39 @@ void wifiIntentConstruction(VTRequest& req, VTResponse& res)
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.connectivity.wifi");
     intent.knownParameters("/networks");
-    intent.endpoint("/otherthing");
+    intent.endpoint("/wifi");
 
     res.write(intent);
 }
-/*
-void wifiIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
+
+void wifiIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 {
     DEBUGOUT("main: wifi invocation\r\n");
 
-    // debug: print object tree
-    object.print();
+    VTIntentInvocation invocation(req.getBody());
 
     /////////////////////////////////////////
     // retrieve parameters
-    ssid_string = object.getParameters()->find("ssid")->getString();
-    key_string = object.getParameters()->find("key")->getString();
+    invocation.getParameters().find("ssid").getString(ssid_string);
+    invocation.getParameters().find("key").getString(key_string);
 
     /////////////////////////////////////////
     // create coda
 
     // Read ID from invocation. ID is returned in coda response.
-    uint32_t invocationID = object.getID();
+    uint32_t invocationID = invocation.getID();
 
-    // create coda and pass to Voytalk hub
-    VoytalkCoda coda(invocationID, 1);
-    hub.processCoda(coda);
+    VTCoda coda(invocationID);
+    coda.success(true);
+    res.write(coda);
+    done(200);
 
     // change state in main application
     state |= FLAG_PROVISIONED;
 
     // change state inside Voytalk hub
-    hub.setStateMask(state);
-}*/
+    router.setStateMask(state);
+}
 
 
 
@@ -401,7 +401,7 @@ void app_start(int, char *[])
     */
 
     router.get("/networks", networkListResource);
-    router.post("/otherthing", networkListResource);
+    router.post("/wifi", wifiIntentInvocation);
 
     /*************************************************************************/
     /*************************************************************************/
