@@ -25,7 +25,7 @@
 /*****************************************************************************/
 
 // set device name
-const char DEVICE_NAME[] = "Testvoy";
+const char DEVICE_NAME[] = "Testoy";
 
 // set TX power
 #ifndef CFG_BLE_TX_POWER_LEVEL
@@ -219,34 +219,35 @@ void resetIntentConstruction(VTRequest& req, VTResponse& res)
 
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.reset");
-
+    intent.endpoint("/reset");
     res.write(intent);
 }
-/*
-void resetIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
+
+void resetIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 {
     DEBUGOUT("main: reset invocation\r\n");
 
-    // print object tree
-    object.print();
+    VTIntentInvocation invocation(req.getBody());
 
-    /////////////////////////////////////////
-    // create coda
+    // print object tree
+    invocation.getParameters().print();
+
+    ssid_string = "";
+    key_string = "";
 
     // Read ID from invocation. ID is returned in coda response.
-    uint32_t invocationID = object.getID();
-
-    // create coda and pass to Voytalk hub
-    VoytalkCoda coda(invocationID, 1);
-    hub.processCoda(coda);
+    VTCoda coda(invocation.getID());
+    coda.success(true);
+    res.write(coda);
+    done(200);
 
     // change state in main application
     state &= ~FLAG_PROVISIONED;
 
     // change state inside Voytalk hub
-    hub.setStateMask(state);
+    router.setStateMask(state);
 }
-*/
+
 
 /*****************************************************************************/
 /* Voytalk complex example                                                   */
@@ -261,25 +262,10 @@ void exampleIntentConstruction(VTRequest& req, VTResponse& res)
 
     /* create intent */
     VTIntent intent("com.arm.examples.complex");
+    intent.endpoint("/examples/complex");
 
     res.write(intent);
 }
-/*
-void exampleIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
-{
-    DEBUGOUT("main: complex example invocation\r\n");
-
-    // print object tree
-    object.print();
-
-    // Read ID from invocation. ID is returned in coda response.
-    uint32_t invocationID = object.getID();
-
-    // create coda and pass to Voytalk hub
-    VoytalkCoda coda(invocationID, 1);
-    hub.processCoda(coda);
-}
-*/
 
 /*****************************************************************************/
 /* Voytalk custom example                                                    */
@@ -288,57 +274,42 @@ void exampleIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
 void customIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: custom intent construction\r\n");
-
-    // /*  Define custom constraints.
-    //     Note: constraints can be nested.
-    // */
-
-    // /* ssid, key are level 0 variables */
-    // VoytalkConstraint L0_ssid("Network Name",
-    //                           VoytalkConstraint::TypeString,
-    //                           "ssid");
-
-    // VoytalkConstraint L0_key("Password",
-    //                          VoytalkConstraint::TypeString,
-    //                          "key");
-
-    // /* combine level 0 variables */
-    // VoytalkConstraint* properties[] = { &L0_ssid,
-    //                                     &L0_key };
-
-    // // define level 0
-    // VoytalkConstraint constraints("Custom Access",
-    //                               properties);
-
-    // /* optional: default values */
-    // L0_ssid.setDefaultValue("homehub");
-
-    // /* optional: description fields */
-    // L0_ssid.setDescription("The name of the network you want to connect to.");
-    // L0_key.setDescription("The password for the network.");
-
-    // constraints.setDescription("The device wants to access your Wifi network.");
-
-    // /* create intent using generated endpoint and constraint set */
-    // VTIntent intent("com.arm.examples.custom", constraints);
-
-    // callback(200, intent);
+    /* create intent using generated endpoint and constraint set */
+    VTIntent intent("com.arm.examples.custom");
+    intent.endpoint("/custom");
+    intent.constraints()
+        .title("Hello!")
+        .description("This is the description")
+        .addConstraint("test",
+            VTConstraint(VTConstraint::TypeString)
+                .title("Test")
+                .defaultValue("default goes here")
+        )
+        .addConstraint("test2",
+            VTConstraint(VTConstraint::TypeString)
+                .title("Other test")
+                .defaultValue("default goes here")
+        );
+    res.write(intent);
 }
-/*
-void customIntentInvocation(VoytalkHub& hub, VoytalkIntentInvocation& object)
+
+
+
+void printingIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 {
-    DEBUGOUT("main: custom example invocation\r\n");
+    DEBUGOUT("main: invocation receieved \r\n");
 
+    VTIntentInvocation invocation(req.getBody());
+    
     // print object tree
-    object.print();
+    invocation.getParameters().print();
 
-    // Read ID from invocation. ID is returned in coda response.
-    uint32_t invocationID = object.getID();
+    VTCoda coda(invocation.getID());
+    coda.success(true);
+    res.write(coda);
+    done(200);
+}
 
-    // create coda and pass to Voytalk hub
-    VoytalkCoda coda(invocationID, 1);
-    hub.processCoda(coda);
-}*/
 
 
 void networkListResource(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
@@ -383,10 +354,12 @@ void app_start(int, char *[])
                           FLAG_PROVISIONED);
 
     // custom intent
-#if 0
     router.registerIntent(customIntentConstruction,
                          FLAG_CONNECTED | FLAG_PROVISIONED);
-#endif
+    
+    // example intent
+    router.registerIntent(exampleIntentConstruction,
+                         FLAG_CONNECTED | FLAG_PROVISIONED);
 
     /*
         Set the current state mask.
@@ -401,7 +374,11 @@ void app_start(int, char *[])
     */
 
     router.get("/networks", networkListResource);
+
     router.post("/wifi", wifiIntentInvocation);
+    router.post("/reset", resetIntentInvocation);
+    router.post("/custom", printingIntentInvocation);
+    router.post("/examples/complex", printingIntentInvocation);
 
     /*************************************************************************/
     /*************************************************************************/
