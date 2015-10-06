@@ -16,7 +16,7 @@
     }
   ],
   "dependencies": {
-    "voytalk-cpp":"~2.0.0"
+    "voytalk-cpp":"~3.0.0"
   },
   "targetDependencies": {
     "mbed-os": {

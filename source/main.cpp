@@ -172,6 +172,7 @@ void wifiIntentConstruction(VTRequest& req, VTResponse& res)
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.connectivity.wifi");
     intent.knownParameters("/networks");
+    intent.endpoint("/otherthing");
 
     res.write(intent);
 }
@@ -348,13 +349,13 @@ void networkListResource(VTRequest& req, VTResponse& res, VoytalkRouter::done_t 
 
     parameters.parameter("com.arm.connectivity.wifi", 50)
         .map(2)
-            .item("ssid", "miWifi")
-            .item("key", "supersecurepassword");
+            .key("ssid").value("iWifi")
+            .key("key").value("supersecurepassword");
 
     parameters.parameter("com.arm.connectivity.wifi", 20)
         .map(2)
-            .item("ssid", "yoWifi")
-            .item("key", "securepasswordinit");
+            .key("ssid").value("yoWifi")
+            .key("key").value("securepasswordinit");
 
     done(200);
 }
