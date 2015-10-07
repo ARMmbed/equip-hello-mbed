@@ -450,7 +450,7 @@ void signalReady()
 /* Build for mbed Classic                                */
 /*********************************************************/
 
-bool sendNotification = false;
+volatile bool sendNotification = false;
 
 void signalReady()
 {
