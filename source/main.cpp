@@ -171,41 +171,11 @@ void wifiIntentConstruction(VTRequest& req, VTResponse& res)
     DEBUGOUT("main: wifi intent construction\r\n");
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.connectivity.wifi");
-    intent.knownParameters("/networks");
-    intent.endpoint("/wifi");
+    intent.knownParameters("/networks")
+        .endpoint("/wifi");
 
     res.write(intent);
 }
-
-void wifiIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
-{
-    DEBUGOUT("main: wifi invocation\r\n");
-
-    VTIntentInvocation invocation(req.getBody());
-
-    /////////////////////////////////////////
-    // retrieve parameters
-    invocation.getParameters().find("ssid").getString(ssid_string);
-    invocation.getParameters().find("key").getString(key_string);
-
-    /////////////////////////////////////////
-    // create coda
-
-    // Read ID from invocation. ID is returned in coda response.
-    uint32_t invocationID = invocation.getID();
-
-    VTCoda coda(invocationID);
-    coda.success(true);
-    res.write(coda);
-    done(200);
-
-    // change state in main application
-    state |= FLAG_PROVISIONED;
-
-    // change state inside Voytalk hub
-    router.setStateMask(state);
-}
-
 
 
 /*****************************************************************************/
@@ -221,31 +191,6 @@ void resetIntentConstruction(VTRequest& req, VTResponse& res)
     VTIntent intent("com.arm.reset");
     intent.endpoint("/reset");
     res.write(intent);
-}
-
-void resetIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
-{
-    DEBUGOUT("main: reset invocation\r\n");
-
-    VTIntentInvocation invocation(req.getBody());
-
-    // print object tree
-    invocation.getParameters().print();
-
-    ssid_string = "";
-    key_string = "";
-
-    // Read ID from invocation. ID is returned in coda response.
-    VTCoda coda(invocation.getID());
-    coda.success(true);
-    res.write(coda);
-    done(200);
-
-    // change state in main application
-    state &= ~FLAG_PROVISIONED;
-
-    // change state inside Voytalk hub
-    router.setStateMask(state);
 }
 
 
@@ -276,43 +221,77 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
     DEBUGOUT("main: custom intent construction\r\n");
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.examples.custom");
-    intent.endpoint("/custom");
-    intent.constraints()
-        .title("Hello!")
-        .description("This is the description")
-        .addConstraint("test",
-            VTConstraint(VTConstraint::TypeString)
-                .title("Test")
-                .defaultValue("default goes here")
-        )
-        .addConstraint("test2",
-            VTConstraint(VTConstraint::TypeString)
-                .title("Other test")
-                .defaultValue("default goes here")
-        );
+    intent.endpoint("/custom")
+        .constraints()
+            .title("Hello!")
+            .description("This is the description")
+            .addConstraint("test",
+                VTConstraint(VTConstraint::TypeString)
+                    .title("Test")
+                    .defaultValue("default goes here")
+            )
+            .addConstraint("test2",
+                VTConstraint(VTConstraint::TypeString)
+                    .title("Other test")
+                    .defaultValue("default goes here")
+            );
     res.write(intent);
 }
 
 
 
-void printingIntentInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+
+/*****************************************************************************/
+/* Middleware for actually doing stuff                                       */
+/*****************************************************************************/
+
+
+void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 {
-    DEBUGOUT("main: invocation receieved \r\n");
+    VTIntentInvocation invocation(req.getBody());   
+    invocation.getParameters().print();
+}
+
+void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+{
+    DEBUGOUT("main: saving wifi details\r\n");
 
     VTIntentInvocation invocation(req.getBody());
-    
-    // print object tree
-    invocation.getParameters().print();
 
+    invocation.getParameters().find("ssid").getString(ssid_string);
+    invocation.getParameters().find("key").getString(key_string);
+
+    // change state in main application
+    state |= FLAG_PROVISIONED;
+
+    // change state inside Voytalk hub
+    router.setStateMask(state);
+}
+
+void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+{
+    DEBUGOUT("main: reset device\r\n");
+
+    ssid_string = "";
+    key_string = "";
+
+    // change state in main application
+    state &= ~FLAG_PROVISIONED;
+
+    // change state inside Voytalk hub
+    router.setStateMask(state);
+}
+
+void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+{
+    VTIntentInvocation invocation(req.getBody());
     VTCoda coda(invocation.getID());
     coda.success(true);
     res.write(coda);
     done(200);
 }
 
-
-
-void networkListResource(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 {
     DEBUGOUT("listing network resources");
 
@@ -320,7 +299,7 @@ void networkListResource(VTRequest& req, VTResponse& res, VoytalkRouter::done_t 
 
     parameters.parameter("com.arm.connectivity.wifi", 50)
         .map(2)
-            .key("ssid").value("iWifi")
+            .key("ssid").value("miWifi")
             .key("key").value("supersecurepassword");
 
     parameters.parameter("com.arm.connectivity.wifi", 20)
@@ -341,8 +320,7 @@ void app_start(int, char *[])
         Register Voytalk intents in the hub.
 
         First parameter is the callback function for intent generation.
-        Second is the callback function for when the intent is invoked.
-        Third parameter is a bitmap for grouping intents together.
+        Second parameter is a bitmap for grouping intents together.
     */
 
     // Wifi provisioning intent
@@ -354,8 +332,8 @@ void app_start(int, char *[])
                           FLAG_PROVISIONED);
 
     // custom intent
-    router.registerIntent(customIntentConstruction,
-                         FLAG_CONNECTED | FLAG_PROVISIONED);
+    //router.registerIntent(customIntentConstruction,
+    //                     FLAG_CONNECTED | FLAG_PROVISIONED);
     
     // example intent
     router.registerIntent(exampleIntentConstruction,
@@ -373,12 +351,12 @@ void app_start(int, char *[])
         Define some resource callbacks
     */
 
-    router.get("/networks", networkListResource);
+    router.get("/networks",          networkList, NULL);
+    router.post("/wifi",             printInvocation, saveWifi,    sendSuccess, NULL);
+    router.post("/reset",            printInvocation, resetDevice, sendSuccess, NULL);
+    router.post("/custom",           printInvocation,              sendSuccess, NULL);
+    router.post("/examples/complex", printInvocation,              sendSuccess, NULL);
 
-    router.post("/wifi", wifiIntentInvocation);
-    router.post("/reset", resetIntentInvocation);
-    router.post("/custom", printingIntentInvocation);
-    router.post("/examples/complex", printingIntentInvocation);
 
     /*************************************************************************/
     /*************************************************************************/
