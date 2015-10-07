@@ -246,7 +246,7 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 /*****************************************************************************/
 
 
-void printInvocation(VTRequest& req, VTResponse& res, Next&::next_t next)
+void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     VTIntentInvocation invocation(req.getBody());   
     invocation.getParameters().print();
