@@ -246,13 +246,14 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 /*****************************************************************************/
 
 
-void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void printInvocation(VTRequest& req, VTResponse& res, Next&::next_t next)
 {
     VTIntentInvocation invocation(req.getBody());   
     invocation.getParameters().print();
+    next();
 }
 
-void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: saving wifi details\r\n");
 
@@ -266,9 +267,11 @@ void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 
     // change state inside Voytalk hub
     router.setStateMask(state);
+
+    next();
 }
 
-void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: reset device\r\n");
 
@@ -280,18 +283,20 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
 
     // change state inside Voytalk hub
     router.setStateMask(state);
+
+    next();
 }
 
-void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     VTIntentInvocation invocation(req.getBody());
     VTCoda coda(invocation.getID());
     coda.success(true);
     res.write(coda);
-    done(200);
+    next(200);
 }
 
-void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
+void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("listing network resources");
 
@@ -307,7 +312,7 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::done_t done)
             .key("ssid").value("yoWifi")
             .key("key").value("securepasswordinit");
 
-    done(200);
+    next(200);
 }
 
 /*****************************************************************************/
@@ -351,7 +356,7 @@ void app_start(int, char *[])
         Define some resource callbacks
     */
 
-    router.get("/networks",          networkList, NULL);
+    router.get("/networks",          networkList,                               NULL);
     router.post("/wifi",             printInvocation, saveWifi,    sendSuccess, NULL);
     router.post("/reset",            printInvocation, resetDevice, sendSuccess, NULL);
     router.post("/custom",           printInvocation,              sendSuccess, NULL);
