@@ -39,6 +39,8 @@ const char DEVICE_NAME[] = "Testoy";
 #define DEBUGOUT(...) /* nothing */
 #endif // DEBUGOUT
 
+#define VERBOSE_DEBUG_OUT 1
+
 /*****************************************************************************/
 
 /* Voytalk short UUID */
@@ -62,11 +64,7 @@ BLE ble;
 // Transfer large blocks of data on platforms without Fragmentation-And-Recombination
 BlockTransferService bts;
 
-// Voytalk handling
-VoytalkRouter router(DEVICE_NAME);
-
 // buffer for sending and receiving data
-SharedPointer<Block> writeBlock;
 uint8_t readBuffer[1000];
 BlockStatic readBlock(readBuffer, sizeof(readBuffer));
 
@@ -76,6 +74,16 @@ std::string key_string;
 
 // Compatibility function
 void signalReady();
+
+void onResponseFinished(const VTResponse& res)
+{
+    DEBUGOUT("main: output buffer usage: %lu of %lu\r\n", readBlock.getLength(), readBlock.getMaxLength());
+    signalReady();
+}
+
+// Voytalk handling
+VoytalkRouter router(DEVICE_NAME, onResponseFinished);
+
 
 /*****************************************************************************/
 /* Functions for handling debug output                                       */
@@ -134,6 +142,19 @@ SharedPointer<Block> blockServerReadHandler(uint32_t offset)
     DEBUGOUT("main: block read\r\n");
     (void) offset;
 
+#if VERBOSE_DEBUG_OUT
+    /* print generated output */
+    if (readBlock.getLength() > 0)
+    {
+        DEBUGOUT("main read:\r\n");
+        for (size_t idx = 0; idx < readBlock.getLength(); idx++)
+        {
+            DEBUGOUT("%02X", readBlock.at(idx));
+        }
+        DEBUGOUT("\r\n\r\n");
+    }
+#endif
+
     return SharedPointer<Block>(new BlockStatic(readBlock));
 }
 
@@ -144,19 +165,23 @@ void blockServerWriteHandler(SharedPointer<Block> block)
 {
     DEBUGOUT("main: block write\r\n");
 
+#if VERBOSE_DEBUG_OUT
+    DEBUGOUT("main write:\r\n");
+    for (size_t idx = 0; idx < block->getLength(); idx++)
+    {
+        DEBUGOUT("%02X", block->at(idx));
+    }
+    DEBUGOUT("\r\n\r\n");
+#endif
+
     /*
         Process received data, assuming it is CBOR encoded.
         Any output generated will be written to the readBlock.
     */
-    router.processCBOR((BlockStatic*) block.get(), &readBlock);
 
-    /*
-        If the readBlock length is non-zero it means a reply has been generated.
-    */
-    if (readBlock.getLength() > 0)
-    {
-        signalReady();
-    }
+    DEBUGOUT("main: input buffer usage: %lu of %lu\r\n", readBlock.getLength(), readBlock.getMaxLength());
+
+    router.processCBOR((BlockStatic*) block.get(), &readBlock);
 }
 
 /*****************************************************************************/
@@ -289,6 +314,7 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 
 void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
+    DEBUGOUT("main: sending success coda");
     VTIntentInvocation invocation(req.getBody());
     VTCoda coda(invocation.getID());
     coda.success(true);
@@ -298,7 +324,7 @@ void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 
 void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
-    DEBUGOUT("listing network resources");
+    DEBUGOUT("main: listing network resources");
 
     VoytalkKnownParameters parameters(res, 2);
 
