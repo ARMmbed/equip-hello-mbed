@@ -225,12 +225,12 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
         .constraints()
             .title("Hello!")
             .description("This is the description")
-            .addConstraint("test",
+            .addProperty("test",
                 VTConstraint(VTConstraint::TypeString)
                     .title("Test")
                     .defaultValue("default goes here")
             )
-            .addConstraint("test2",
+            .addProperty("test2",
                 VTConstraint(VTConstraint::TypeString)
                     .title("Other test")
                     .defaultValue("default goes here")
