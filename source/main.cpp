@@ -64,9 +64,9 @@ BLE ble;
 // Transfer large blocks of data on platforms without Fragmentation-And-Recombination
 BlockTransferService bts;
 
-// buffer for sending and receiving data
+// buffer for sending data
 uint8_t readBuffer[1000];
-BlockStatic readBlock(readBuffer, sizeof(readBuffer));
+SharedPointer<Block> readBlock(new BlockStatic(readBuffer, sizeof(readBuffer)));
 
 // wifi parameters
 std::string ssid_string;
@@ -77,7 +77,7 @@ void signalReady();
 
 void onResponseFinished(const VTResponse& res)
 {
-    DEBUGOUT("main: output buffer usage: %lu of %lu\r\n", readBlock.getLength(), readBlock.getMaxLength());
+    DEBUGOUT("main: output buffer usage: %lu of %lu\r\n", readBlock->getLength(), readBlock->getMaxLength());
     signalReady();
 }
 
@@ -144,18 +144,17 @@ SharedPointer<Block> blockServerReadHandler(uint32_t offset)
 
 #if VERBOSE_DEBUG_OUT
     /* print generated output */
-    if (readBlock.getLength() > 0)
+    if (readBlock->getLength() > 0)
     {
-        DEBUGOUT("main read:\r\n");
-        for (size_t idx = 0; idx < readBlock.getLength(); idx++)
+        for (size_t idx = 0; idx < readBlock->getLength(); idx++)
         {
-            DEBUGOUT("%02X", readBlock.at(idx));
+            DEBUGOUT("%02X", readBlock->at(idx));
         }
         DEBUGOUT("\r\n\r\n");
     }
 #endif
 
-    return SharedPointer<Block>(new BlockStatic(readBlock));
+    return readBlock;
 }
 
 /*
@@ -179,9 +178,9 @@ void blockServerWriteHandler(SharedPointer<Block> block)
         Any output generated will be written to the readBlock.
     */
 
-    DEBUGOUT("main: input buffer usage: %lu of %lu\r\n", readBlock.getLength(), readBlock.getMaxLength());
+    DEBUGOUT("main: input buffer usage: %lu of %lu\r\n", block->getLength(), block->getMaxLength());
 
-    router.processCBOR((BlockStatic*) block.get(), &readBlock);
+    router.processCBOR((BlockStatic*) block.get(), (BlockStatic*) readBlock.get());
 }
 
 /*****************************************************************************/
@@ -273,7 +272,7 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 
 void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
-    VTIntentInvocation invocation(req.getBody());   
+    VTIntentInvocation invocation(req.getBody());
     invocation.getParameters().print();
     next();
 }
@@ -314,7 +313,7 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 
 void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
-    DEBUGOUT("main: sending success coda");
+    DEBUGOUT("main: sending success coda\r\n");
     VTIntentInvocation invocation(req.getBody());
     VTCoda coda(invocation.getID());
     coda.success(true);
@@ -365,7 +364,7 @@ void app_start(int, char *[])
     // custom intent
     //router.registerIntent(customIntentConstruction,
     //                     FLAG_CONNECTED | FLAG_PROVISIONED);
-    
+
     // example intent
     router.registerIntent(exampleIntentConstruction,
                          FLAG_CONNECTED | FLAG_PROVISIONED);
