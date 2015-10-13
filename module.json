@@ -1,6 +1,6 @@
 {
   "name": "voytalk-hello-mbed",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "description": "Voytalk client example for mbed",
   "keywords": [],
   "author": "Andy Pritchard",
@@ -16,7 +16,7 @@
     }
   ],
   "dependencies": {
-    "voytalk-cpp":"~3.2.0"
+    "voytalk-cpp": "~3.2.0"
   },
   "targetDependencies": {
     "mbed-os": {
