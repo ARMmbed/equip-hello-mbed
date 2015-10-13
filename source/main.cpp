@@ -366,14 +366,14 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
     VoytalkKnownParameters parameters(res, 2);
 
     parameters.parameter("com.arm.connectivity.wifi", 50)
-        .map(2)
+        .map()
             .key("ssid").value("miWifi")
-            .key("key").value("supersecurepassword");
+        .end();
 
     parameters.parameter("com.arm.connectivity.wifi", 20)
-        .map(2)
+        .map()
             .key("ssid").value("yoWifi")
-            .key("key").value("securepasswordinit");
+        .end();
 
     next(200);
 }
