@@ -25,7 +25,7 @@
 /*****************************************************************************/
 
 // set device name
-const char DEVICE_NAME[] = "Testoy";
+const char DEVICE_NAME[] = "mbed Provisioning";
 
 // set TX power
 #ifndef CFG_BLE_TX_POWER_LEVEL
@@ -64,9 +64,10 @@ BLE ble;
 // Transfer large blocks of data on platforms without Fragmentation-And-Recombination
 BlockTransferService bts;
 
-// buffer for sending data
+// variables for sending and receiving data
 uint8_t readBuffer[1000];
 SharedPointer<Block> readBlock(new BlockStatic(readBuffer, sizeof(readBuffer)));
+SharedPointer<Block> writeBlock;
 
 // wifi parameters
 std::string ssid_string;
@@ -78,7 +79,13 @@ void signalReady();
 void onResponseFinished(const VTResponse& res)
 {
     DEBUGOUT("main: output buffer usage: %lu of %lu\r\n", readBlock->getLength(), readBlock->getMaxLength());
+    (void) res;
+
+    // signal response is ready to be read
     signalReady();
+
+    // free reference counted block
+    writeBlock = SharedPointer<Block>();
 }
 
 // Voytalk handling
@@ -139,7 +146,7 @@ void blockServerSendNotification()
 */
 SharedPointer<Block> blockServerReadHandler(uint32_t offset)
 {
-    DEBUGOUT("main: block read\r\n");
+    DEBUGOUT("main: block read: %lu\r\n", readBlock->getLength());
     (void) offset;
 
 #if VERBOSE_DEBUG_OUT
@@ -181,6 +188,9 @@ void blockServerWriteHandler(SharedPointer<Block> block)
     DEBUGOUT("main: input buffer usage: %lu of %lu\r\n", block->getLength(), block->getMaxLength());
 
     router.processCBOR((BlockStatic*) block.get(), (BlockStatic*) readBlock.get());
+
+    // save block until we are done processing this request
+    writeBlock = block;
 }
 
 /*****************************************************************************/
@@ -193,6 +203,8 @@ void blockServerWriteHandler(SharedPointer<Block> block)
 void wifiIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: wifi intent construction\r\n");
+    (void) req;
+
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.connectivity.wifi");
     intent.knownParameters("/networks")
@@ -210,6 +222,7 @@ void wifiIntentConstruction(VTRequest& req, VTResponse& res)
 void resetIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: reset intent construction\r\n");
+    (void) req;
 
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.reset");
@@ -228,6 +241,7 @@ void resetIntentConstruction(VTRequest& req, VTResponse& res)
 void exampleIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: complex example intent construction\r\n");
+    (void) req;
 
     /* create intent */
     VTIntent intent("com.arm.examples.complex");
@@ -243,6 +257,8 @@ void exampleIntentConstruction(VTRequest& req, VTResponse& res)
 void customIntentConstruction(VTRequest& req, VTResponse& res)
 {
     DEBUGOUT("main: custom intent construction\r\n");
+    (void) req;
+
     /* create intent using generated endpoint and constraint set */
     VTIntent intent("com.arm.examples.custom");
     intent.endpoint("/custom")
@@ -269,17 +285,33 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 /* Middleware for actually doing stuff                                       */
 /*****************************************************************************/
 
+VoytalkNext demoCallbackHandle;
+
+void demoCallbackTask()
+{
+    demoCallbackHandle();
+}
 
 void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
+    (void) req;
+    (void) res;
+
     VTIntentInvocation invocation(req.getBody());
     invocation.getParameters().print();
-    next();
+
+    // save callback so it can be called asynchronously
+    demoCallbackHandle = next;
+
+    // post call to function to demo asynchronous callback
+    minar::Scheduler::postCallback(demoCallbackTask);
 }
 
 void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: saving wifi details\r\n");
+    (void) req;
+    (void) res;
 
     VTIntentInvocation invocation(req.getBody());
 
@@ -298,6 +330,8 @@ void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: reset device\r\n");
+    (void) req;
+    (void) res;
 
     ssid_string = "";
     key_string = "";
@@ -314,6 +348,8 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: sending success coda\r\n");
+    (void) req;
+
     VTIntentInvocation invocation(req.getBody());
     VTCoda coda(invocation.getID());
     coda.success(true);
@@ -324,6 +360,8 @@ void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
 {
     DEBUGOUT("main: listing network resources");
+    (void) req;
+    (void) res;
 
     VoytalkKnownParameters parameters(res, 2);
 
