@@ -285,14 +285,16 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 /* Middleware for actually doing stuff                                       */
 /*****************************************************************************/
 
-VoytalkNext demoCallbackHandle;
+VTRequest* demoCallbackRequest = NULL;
+VTResponse* demoCallbackResponse = NULL;
+VoytalkRouter::next_t demoCallbackHandle;
 
 void demoCallbackTask()
 {
     demoCallbackHandle();
 }
 
-void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
+void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 {
     (void) req;
     (void) res;
@@ -300,14 +302,16 @@ void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next
     VTIntentInvocation invocation(req.getBody());
     invocation.getParameters().print();
 
-    // save callback so it can be called asynchronously
+    // save parameters so callback can be called asynchronously
+    demoCallbackRequest = &req;
+    demoCallbackResponse = &res;
     demoCallbackHandle = next;
 
     // post call to function to demo asynchronous callback
     minar::Scheduler::postCallback(demoCallbackTask);
 }
 
-void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
+void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 {
     DEBUGOUT("main: saving wifi details\r\n");
     (void) req;
@@ -327,7 +331,7 @@ void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
     next();
 }
 
-void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
+void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 {
     DEBUGOUT("main: reset device\r\n");
     (void) req;
@@ -345,7 +349,7 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
     next();
 }
 
-void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
+void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 {
     DEBUGOUT("main: sending success coda\r\n");
     (void) req;
@@ -357,7 +361,7 @@ void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
     next(200);
 }
 
-void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t next)
+void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 {
     DEBUGOUT("main: listing network resources");
     (void) req;
