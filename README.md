@@ -55,10 +55,10 @@ cd voytalk-hello-mbed
 yotta must know which platform (target) it is building to. So we declare the target, then build.
 
 ```bash
-yotta target frdm-k64f-gcc
+yotta target nrf51dk-gcc
 yotta build
 ```
 
 The resulting binary file will be located in
-`build/frdm-k64f-gcc/source/`.
+`build/nrf51dk-gcc/source/`.
 
