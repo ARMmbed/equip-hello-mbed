@@ -1,6 +1,6 @@
 {
   "name": "voytalk-hello-mbed",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "description": "Voytalk client example for mbed",
   "keywords": [],
   "author": "Andy Pritchard",
