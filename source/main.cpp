@@ -371,12 +371,12 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 
     parameters.begin();
 
-    parameters.parameter("com.arm.connectivity.wifi", 50)
+    parameters.parameter("com.arm.connectivity.wifi", 255)
         .map()
             .key("ssid").value("miWifi")
         .end();
 
-    parameters.parameter("com.arm.connectivity.wifi", 20)
+    parameters.parameter("com.arm.connectivity.wifi", 125)
         .map()
             .key("ssid").value("yoWifi")
         .end();
