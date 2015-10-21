@@ -367,7 +367,9 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
     (void) req;
     (void) res;
 
-    VoytalkKnownParameters parameters(res, 2);
+    VoytalkKnownParameters parameters(res);
+
+    parameters.begin();
 
     parameters.parameter("com.arm.connectivity.wifi", 50)
         .map()
@@ -378,6 +380,8 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
         .map()
             .key("ssid").value("yoWifi")
         .end();
+
+    parameters.end();
 
     next(200);
 }
