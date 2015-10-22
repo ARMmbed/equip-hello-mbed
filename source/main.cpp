@@ -18,7 +18,10 @@
 #include "mbed.h"
 #include "ble/BLE.h"
 #include "ble-blocktransfer/BlockTransferService.h"
-#include "voytalk/Voytalk.h"
+#include "equip/Equip.h"
+
+// todo: use explicit namespaces?
+using namespace Equip;
 
 /*****************************************************************************/
 /* Configuration                                                             */
@@ -43,10 +46,10 @@ const char DEVICE_NAME[] = "mbed Provisioning";
 
 /*****************************************************************************/
 
-/* Voytalk short UUID */
+/* short UUID */
 const UUID uuid(0xFE8E);
 
-/* Voytalk states */
+/* states */
 typedef enum {
     FLAG_CONNECTED      = 0x01,
     FLAG_PROVISIONED    = 0x02,
@@ -76,7 +79,7 @@ std::string key_string;
 // Compatibility function
 void signalReady();
 
-void onResponseFinished(const VTResponse& res)
+void onResponseFinished(const Response& res)
 {
     DEBUGOUT("main: output buffer usage: %lu of %lu\r\n", readBlock->getLength(), readBlock->getMaxLength());
     (void) res;
@@ -88,8 +91,8 @@ void onResponseFinished(const VTResponse& res)
     writeBlock = SharedPointer<Block>();
 }
 
-// Voytalk handling
-VoytalkRouter router(DEVICE_NAME, onResponseFinished);
+// mbed Provisioing App client library
+Router router(DEVICE_NAME, onResponseFinished);
 
 
 /*****************************************************************************/
@@ -109,7 +112,7 @@ void whenConnected(const Gap::ConnectionCallbackParams_t* params)
     // change state in main application
     state |= FLAG_CONNECTED;
 
-    // change state inside Voytalk hub
+    // change state inside router
     router.setStateMask(state);
 }
 
@@ -123,7 +126,7 @@ void whenDisconnected(const Gap::DisconnectionCallbackParams_t*)
     // change state in main application
     state &= ~FLAG_CONNECTED;
 
-    // change state inside Voytalk hub
+    // change state inside router
     router.setStateMask(state);
 }
 
@@ -194,19 +197,19 @@ void blockServerWriteHandler(SharedPointer<Block> block)
 }
 
 /*****************************************************************************/
-/* Voytalk Wifi example                                                      */
+/* Wifi example                                                              */
 /*****************************************************************************/
 
 /*
     Callback function for constructing wifi intent.
 */
-void wifiIntentConstruction(VTRequest& req, VTResponse& res)
+void wifiIntentConstruction(Request& req, Response& res)
 {
     DEBUGOUT("main: wifi intent construction\r\n");
     (void) req;
 
     /* create intent using generated endpoint and constraint set */
-    VTIntent intent("com.arm.connectivity.wifi");
+    Intent intent("com.arm.connectivity.wifi");
     intent.knownParameters("/networks")
         .endpoint("/wifi");
 
@@ -219,59 +222,59 @@ void wifiIntentConstruction(VTRequest& req, VTResponse& res)
 /*****************************************************************************/
 
 
-void resetIntentConstruction(VTRequest& req, VTResponse& res)
+void resetIntentConstruction(Request& req, Response& res)
 {
     DEBUGOUT("main: reset intent construction\r\n");
     (void) req;
 
     /* create intent using generated endpoint and constraint set */
-    VTIntent intent("com.arm.reset");
+    Intent intent("com.arm.reset");
     intent.endpoint("/reset");
     res.write(intent);
 }
 
 
 /*****************************************************************************/
-/* Voytalk complex example                                                   */
+/* complex example                                                           */
 /*****************************************************************************/
 
 /*
     Callback functions for the example intent.
 */
-void exampleIntentConstruction(VTRequest& req, VTResponse& res)
+void exampleIntentConstruction(Request& req, Response& res)
 {
     DEBUGOUT("main: complex example intent construction\r\n");
     (void) req;
 
     /* create intent */
-    VTIntent intent("com.arm.examples.complex");
+    Intent intent("com.arm.examples.complex");
     intent.endpoint("/examples/complex");
 
     res.write(intent);
 }
 
 /*****************************************************************************/
-/* Voytalk custom example                                                    */
+/* custom example                                                            */
 /*****************************************************************************/
 
-void customIntentConstruction(VTRequest& req, VTResponse& res)
+void customIntentConstruction(Request& req, Response& res)
 {
     DEBUGOUT("main: custom intent construction\r\n");
     (void) req;
 
     /* create intent using generated endpoint and constraint set */
-    VTIntent intent("com.arm.examples.custom");
+    Intent intent("com.arm.examples.custom");
     intent.endpoint("/custom")
         .constraints()
             .title("Hello!")
             .description("This is the description")
             .addProperty("test",
-                VTConstraint(VTConstraint::TypeString)
+                Constraint(Constraint::TypeString)
                     .title("Test")
                     .defaultValue("default goes here")
             )
             .addProperty("test2",
-                VTConstraint(VTConstraint::TypeString)
+                Constraint(Constraint::TypeString)
                     .title("Other test")
                     .defaultValue("default goes here")
             );
@@ -285,21 +288,21 @@ void customIntentConstruction(VTRequest& req, VTResponse& res)
 /* Middleware for actually doing stuff                                       */
 /*****************************************************************************/
 
-VTRequest* demoCallbackRequest = NULL;
-VTResponse* demoCallbackResponse = NULL;
-VoytalkRouter::next_t demoCallbackHandle;
+Request* demoCallbackRequest = NULL;
+Response* demoCallbackResponse = NULL;
+Router::next_t demoCallbackHandle;
 
 void demoCallbackTask()
 {
     demoCallbackHandle();
 }
 
-void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
+void printInvocation(Request& req, Response& res, Router::next_t& next)
 {
     (void) req;
     (void) res;
 
-    VTIntentInvocation invocation(req.getBody());
+    IntentInvocation invocation(req.getBody());
     invocation.getParameters().print();
 
     // save parameters so callback can be called asynchronously
@@ -311,13 +314,13 @@ void printInvocation(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& nex
     minar::Scheduler::postCallback(demoCallbackTask);
 }
 
-void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
+void saveWifi(Request& req, Response& res, Router::next_t& next)
 {
     DEBUGOUT("main: saving wifi details\r\n");
     (void) req;
     (void) res;
 
-    VTIntentInvocation invocation(req.getBody());
+    IntentInvocation invocation(req.getBody());
 
     invocation.getParameters().find("ssid").getString(ssid_string);
     invocation.getParameters().find("key").getString(key_string);
@@ -325,13 +328,13 @@ void saveWifi(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
     // change state in main application
     state |= FLAG_PROVISIONED;
 
-    // change state inside Voytalk hub
+    // change state inside router
     router.setStateMask(state);
 
     next();
 }
 
-void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
+void resetDevice(Request& req, Response& res, Router::next_t& next)
 {
     DEBUGOUT("main: reset device\r\n");
     (void) req;
@@ -343,31 +346,31 @@ void resetDevice(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
     // change state in main application
     state &= ~FLAG_PROVISIONED;
 
-    // change state inside Voytalk hub
+    // change state inside router
     router.setStateMask(state);
 
     next();
 }
 
-void sendSuccess(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
+void sendSuccess(Request& req, Response& res, Router::next_t& next)
 {
     DEBUGOUT("main: sending success coda\r\n");
     (void) req;
 
-    VTIntentInvocation invocation(req.getBody());
-    VTCoda coda(invocation.getID());
+    IntentInvocation invocation(req.getBody());
+    Coda coda(invocation.getID());
     coda.success(true);
     res.write(coda);
     next(200);
 }
 
-void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
+void networkList(Request& req, Response& res, Router::next_t& next)
 {
     DEBUGOUT("main: listing network resources");
     (void) req;
     (void) res;
 
-    VoytalkKnownParameters parameters(res);
+    KnownParameters parameters(res);
 
     parameters.begin();
 
@@ -393,7 +396,7 @@ void networkList(VTRequest& req, VTResponse& res, VoytalkRouter::next_t& next)
 void app_start(int, char *[])
 {
     /*
-        Register Voytalk intents in the hub.
+        Register intents in the router.
 
         First parameter is the callback function for intent generation.
         Second parameter is a bitmap for grouping intents together.
@@ -472,7 +475,7 @@ void app_start(int, char *[])
     // ble setup complete - start advertising
     ble.gap().startAdvertising();
 
-    printf("Voytalk Test: %s %s\r\n", __DATE__, __TIME__);
+    printf("Test: %s %s\r\n", __DATE__, __TIME__);
 }
 
 
