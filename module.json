@@ -16,18 +16,18 @@
     }
   ],
   "dependencies": {
-    "equip-cpp": "^4.0.0"
+    "equip-cpp": "^5.0.0"
   },
   "targetDependencies": {
     "mbed-os": {
-      "mbed-drivers": "~0.10.0"
+      "mbed-drivers": "<1.1.0"
     },
     "mbed-classic": {
       "mbed-classic": "~0.0.4"
     },
     "mbed": {
       "ble": "^1.0.0",
-      "ble-blocktransfer-mbed": "^4.0.0"
+      "ble-blocktransfer-mbed": "^5.0.0"
     }
   },
   "bin": "./source"
