@@ -26,8 +26,8 @@
       "mbed-classic": "~0.0.4"
     },
     "mbed": {
-      "ble": "^1.0.0",
-      "ble-blocktransfer-mbed": "^5.0.0"
+      "ble": "^2.0.0",
+      "ble-blocktransfer-mbed": "^6.0.0"
     }
   },
   "bin": "./source"
