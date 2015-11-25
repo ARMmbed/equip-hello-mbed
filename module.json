@@ -27,7 +27,7 @@
     },
     "mbed": {
       "ble": "^2.0.0",
-      "ble-blocktransfer-mbed": "^6.0.0"
+      "ble-blocktransfer-mbed": "^7.0.0"
     }
   },
   "bin": "./source"

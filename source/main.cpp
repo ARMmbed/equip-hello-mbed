@@ -70,7 +70,7 @@ BlockTransferService bts;
 // variables for sending and receiving data
 uint8_t readBuffer[1000];
 SharedPointer<Block> readBlock(new BlockStatic(readBuffer, sizeof(readBuffer)));
-SharedPointer<Block> writeBlock;
+SharedPointer<BlockStatic> writeBlock;
 
 // wifi parameters
 std::string ssid_string;
@@ -88,7 +88,7 @@ void onResponseFinished(const Response& res)
     signalReady();
 
     // free reference counted block
-    writeBlock = SharedPointer<Block>();
+    writeBlock = SharedPointer<BlockStatic>();
 }
 
 // mbed Provisioing App client library
@@ -170,7 +170,7 @@ SharedPointer<Block> blockServerReadHandler(uint32_t offset)
 /*
     Function called when data has been written over BLE.
 */
-void blockServerWriteHandler(SharedPointer<Block> block)
+void blockServerWriteHandler(SharedPointer<BlockStatic> block)
 {
     DEBUGOUT("main: block write\r\n");
 
